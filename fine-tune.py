@@ -23,6 +23,8 @@ import torch
 import transformers
 from torch.utils.data import Dataset
 from transformers import Trainer, DataCollatorForLanguageModeling
+
+from bert_attn_replace import replace_bert_attn
 from llama_attn_replace import replace_llama_attn
 from gptneox_attn_replace import replace_gpt_neox_attn
 from peft import LoraConfig, get_peft_model
@@ -108,9 +110,12 @@ def train():
     # NOTE: May expand supported model types in the future
     if model_args.model_type == "gpt-neox":
         replace_gpt_neox_attn(training_args.use_flash_attn, training_args.use_full_attn)
-    else:
-        assert model_args.model_type == "llama", "Only support llama and gpt-neox for now"
+    elif model_args.model_type == "llama":
         replace_llama_attn(training_args.use_flash_attn, training_args.use_full_attn)
+    elif model_args.model_type == "bert":
+        replace_bert_attn(training_args.use_flash_attn, training_args.use_full_attn)
+    else:
+        raise IOError("Only support llama, gpt-neox, bert for now")
 
     # Set RoPE scaling factor
     config = transformers.AutoConfig.from_pretrained(
@@ -118,17 +123,19 @@ def train():
         cache_dir=training_args.cache_dir,
     )
 
-    orig_rope_scaling = getattr(config, "rope_scaling", None)
-    if orig_rope_scaling is None:
-        orig_rope_scaling = {"factor": 1}
+    if model_args.model_type in ["llama", "gpt-neox"]:
+        # Didn't use RoPE scaling for BERT.
+        orig_rope_scaling = getattr(config, "rope_scaling", None)
+        if orig_rope_scaling is None:
+            orig_rope_scaling = {"factor": 1}
 
-    orig_rope_scaling_factor = orig_rope_scaling["factor"] if "factor" in orig_rope_scaling.keys() else 1
-    orig_ctx_len = getattr(config, "max_position_embeddings", None)
-    if orig_ctx_len:
-        orig_ctx_len *= orig_rope_scaling_factor
-        if training_args.model_max_length > orig_ctx_len:
-            scaling_factor = float(math.ceil(training_args.model_max_length / orig_ctx_len))
-            config.rope_scaling = {"type": "linear", "factor": scaling_factor}
+        orig_rope_scaling_factor = orig_rope_scaling["factor"] if "factor" in orig_rope_scaling.keys() else 1
+        orig_ctx_len = getattr(config, "max_position_embeddings", None)
+        if orig_ctx_len:
+            orig_ctx_len *= orig_rope_scaling_factor
+            if training_args.model_max_length > orig_ctx_len:
+                scaling_factor = float(math.ceil(training_args.model_max_length / orig_ctx_len))
+                config.rope_scaling = {"type": "linear", "factor": scaling_factor}
 
     # Load model and tokenizer
     model = transformers.AutoModelForCausalLM.from_pretrained(
@@ -180,7 +187,7 @@ def train():
             # added `dense` to match with llama as the basic LoRA would only target 'query_key_value'
             targets = ["query_key_value", "dense"]
         else:
-            targets=["q_proj", "k_proj", "v_proj", "o_proj"]
+            targets = ["q_proj", "k_proj", "v_proj", "o_proj"]
 
         config = LoraConfig(
             r=8,
