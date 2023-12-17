@@ -113,7 +113,7 @@ def train():
     elif model_args.model_type == "llama":
         replace_llama_attn(training_args.use_flash_attn, training_args.use_full_attn)
     elif model_args.model_type == "bert":
-        replace_bert_attn(training_args.use_flash_attn, training_args.use_full_attn)
+        replace_bert_attn()
     else:
         raise IOError("Only support llama, gpt-neox, bert for now")
 
