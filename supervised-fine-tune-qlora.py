@@ -27,6 +27,8 @@ import torch.nn as nn
 import transformers
 from torch.utils.data import Dataset
 from transformers import Trainer, DataCollatorForLanguageModeling, BitsAndBytesConfig
+
+from bert_attn_replace import replace_bert_attn
 from llama_attn_replace_sft import replace_llama_attn
 from gptneox_attn_replace import replace_gpt_neox_attn
 from peft import LoraConfig, get_peft_model
@@ -237,10 +239,15 @@ def train():
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     # NOTE: May expand supported model types in the future
+    # NOTE: May expand supported model types in the future
     if model_args.model_type == "gpt-neox":
         replace_gpt_neox_attn(training_args.use_flash_attn, training_args.use_full_attn)
-    else:
+    elif model_args.model_type == "llama":
         replace_llama_attn(training_args.use_flash_attn, training_args.use_full_attn)
+    elif model_args.model_type == "bert":
+        replace_bert_attn(training_args.use_flash_attn, training_args.use_full_attn)
+    else:
+        raise IOError("Only support llama, gpt-neox, bert for now")
 
     # Set RoPE scaling factor
     config = transformers.AutoConfig.from_pretrained(

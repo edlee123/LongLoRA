@@ -123,19 +123,18 @@ def train():
         cache_dir=training_args.cache_dir,
     )
 
-    if model_args.model_type in ["llama", "gpt-neox"]:
-        # Didn't use RoPE scaling for BERT.
-        orig_rope_scaling = getattr(config, "rope_scaling", None)
-        if orig_rope_scaling is None:
-            orig_rope_scaling = {"factor": 1}
+    # Does ROPE scaling work with HuggingFace BERT classes?
+    orig_rope_scaling = getattr(config, "rope_scaling", None)
+    if orig_rope_scaling is None:
+        orig_rope_scaling = {"factor": 1}
 
-        orig_rope_scaling_factor = orig_rope_scaling["factor"] if "factor" in orig_rope_scaling.keys() else 1
-        orig_ctx_len = getattr(config, "max_position_embeddings", None)
-        if orig_ctx_len:
-            orig_ctx_len *= orig_rope_scaling_factor
-            if training_args.model_max_length > orig_ctx_len:
-                scaling_factor = float(math.ceil(training_args.model_max_length / orig_ctx_len))
-                config.rope_scaling = {"type": "linear", "factor": scaling_factor}
+    orig_rope_scaling_factor = orig_rope_scaling["factor"] if "factor" in orig_rope_scaling.keys() else 1
+    orig_ctx_len = getattr(config, "max_position_embeddings", None)
+    if orig_ctx_len:
+        orig_ctx_len *= orig_rope_scaling_factor
+        if training_args.model_max_length > orig_ctx_len:
+            scaling_factor = float(math.ceil(training_args.model_max_length / orig_ctx_len))
+            config.rope_scaling = {"type": "linear", "factor": scaling_factor}
 
     # Load model and tokenizer
     model = transformers.AutoModelForCausalLM.from_pretrained(
