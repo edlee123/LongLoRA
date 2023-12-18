@@ -137,12 +137,22 @@ def train():
             config.rope_scaling = {"type": "linear", "factor": scaling_factor}
 
     # Load model and tokenizer
-    model = transformers.AutoModelForCausalLM.from_pretrained(
-        model_args.model_name_or_path,
-        config=config,
-        cache_dir=training_args.cache_dir,
-        torch_dtype=torch.bfloat16,
-    )
+    if model_args.model_type == "bert":
+        model = transformers.AutoModelForMaskedLM.from_pretrained(
+            model_args.model_name_or_path,
+            config=config,
+            cache_dir=training_args.cache_dir,
+            torch_dtype=torch.bfloat16,
+        )
+
+    else:
+
+        model = transformers.AutoModelForCausalLM.from_pretrained(
+            model_args.model_name_or_path,
+            config=config,
+            cache_dir=training_args.cache_dir,
+            torch_dtype=torch.bfloat16,
+        )
 
     tokenizer = transformers.AutoTokenizer.from_pretrained(
         model_args.model_name_or_path,
